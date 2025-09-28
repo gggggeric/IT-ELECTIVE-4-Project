@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import './Home.css';
 
 const Home = () => {
@@ -33,13 +34,9 @@ const Home = () => {
 
   return (
     <div className="home-container">
-      {/* Login Section - Centered with proper spacing */}
       <section className="login-section">
         <div className="login-box">
-          {/* Main Title */}
           <h2 className="login-title">TUPT Counseling Scheduler</h2>
-          
-          {/* Subtitle */}
           <div className="login-subtitle">User Authentication</div>
           
           <form onSubmit={handleLoginSubmit}>
@@ -102,9 +99,9 @@ const Home = () => {
 
           {/* For more information link */}
           <div className="more-info-container">
-            <a href="#more-info" className="more-info-link">
+            <Link to="/info" className="more-info-link">
               For more information click here
-            </a>
+            </Link>
           </div>
         </div>
       </section>
