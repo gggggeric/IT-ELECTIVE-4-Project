@@ -99,6 +99,13 @@ const Home = () => {
               </a>
             </div>
           </form>
+
+          {/* For more information link */}
+          <div className="more-info-container">
+            <a href="#more-info" className="more-info-link">
+              For more information click here
+            </a>
+          </div>
         </div>
       </section>
     </div>

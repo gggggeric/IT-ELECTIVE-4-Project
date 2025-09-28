@@ -195,6 +195,26 @@
   font-size: 13px;
 }
 
+/* For more information link styles */
+.more-info-container {
+  margin-top: 20px;
+  text-align: center;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.more-info-link {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.more-info-link:hover {
+  color: white;
+  text-decoration: underline;
+}
+
 /* Mobile Responsive Design */
 @media (max-width: 768px) {
   .home-container {
@@ -252,6 +272,11 @@
   .login-subtitle {
     font-size: 14px;
   }
+  
+  .more-info-container {
+    margin-top: 15px;
+    padding-top: 10px;
+  }
 }
 
 /* Touch-friendly for mobile */
@@ -268,5 +293,12 @@
   .login-box input {
     min-height: 44px; /* Larger touch targets for inputs */
     font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  .more-info-link {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
