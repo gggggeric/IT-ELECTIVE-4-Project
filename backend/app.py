@@ -1,15 +1,19 @@
-from flask import Flask, render_template
+from flask import Flask
 from flask_login import LoginManager
-from database import mongo
+from flask_cors import CORS
+from database import mongo, find_user_by_id, init_app
 from routes import init_routes
 import os
-from dotenv import load_dotenv  # Add this import
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv()  # Add this line
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
+
+# Enable CORS for React frontend
+CORS(app, supports_credentials=True)
 
 # MongoDB configuration from environment variables
 MONGO_USERNAME = os.environ.get('MONGO_USERNAME')
@@ -30,7 +34,7 @@ app.config['MONGO_DB_NAME'] = MONGO_DB_NAME
 
 # Initialize extensions
 try:
-    mongo.init_app(app)
+    init_app(app)  # Use the init_app function from database.py
     print("🎉 MongoDB initialization completed successfully!")
 except Exception as e:
     print(f"💥 CRITICAL: Failed to initialize MongoDB: {e}")
@@ -40,11 +44,18 @@ except Exception as e:
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-login_manager.login_message_category = 'info'
+login_manager.session_protection = "strong"
 
 @login_manager.user_loader
 def load_user(user_id):
-    return mongo.find_user_by_id(user_id)
+    return find_user_by_id(user_id)  # Use the function from database.py
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    return jsonify({
+        'message': 'Authentication required',
+        'error': 'Please login to access this resource'
+    }), 401
 
 # Initialize routes
 init_routes(app)
@@ -52,14 +63,22 @@ init_routes(app)
 @app.route('/test-db')
 def test_db():
     """Route to test database connection"""
-    if mongo.test_connection():
-        return "✅ Database connection is active!"
+    from database import test_connection
+    if test_connection():
+        return jsonify({
+            'message': '✅ Database connection is active!',
+            'status': 'success'
+        })
     else:
-        return "❌ Database connection failed!"
+        return jsonify({
+            'message': '❌ Database connection failed!',
+            'status': 'error'
+        }), 500
 
 if __name__ == '__main__':
-    print("🚀 Starting Flask application...")
+    print("🚀 Starting Flask API server...")
     print(f"📊 Database: {MONGO_DB_NAME}")
     print(f"👤 MongoDB User: {MONGO_USERNAME}")
     print(f"🌐 Server will run on: http://127.0.0.1:5000")
-    app.run(debug=True)
+    print(f"🔗 CORS enabled for React frontend")
+    app.run(debug=True, host='0.0.0.0', port=5000)

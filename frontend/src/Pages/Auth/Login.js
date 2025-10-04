@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import './Login.css';
 
-const Home = () => {
+const Login = () => {
   const [formData, setFormData] = useState({
     username: '',
-    password: '',
-    birthdate: ''
+    password: ''
   });
+
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -15,21 +18,72 @@ const Home = () => {
       ...prevState,
       [name]: value
     }));
+
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    if (errors.general) {
+      setErrors(prev => ({ ...prev, general: '' }));
+    }
   };
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    // Handle login logic here
-    console.log('Login data:', formData);
-    alert('Login functionality would be implemented here!');
+    
+    // Basic validation
+    if (!formData.username || !formData.password) {
+      setErrors({ general: 'Username and password are required' });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:5000/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Important for session cookies
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Login successful
+        console.log('Login successful:', data);
+        alert('Login successful!');
+        // Redirect to dashboard
+        navigate('/dashboard');
+      } else {
+        // Handle errors from Flask backend
+        if (data.error) {
+          setErrors({ general: data.error });
+        } else if (data.message) {
+          setErrors({ general: data.message });
+        } else {
+          setErrors({ general: 'Login failed. Please try again.' });
+        }
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setErrors({ general: 'Network error. Please check if the server is running.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleClearForm = () => {
     setFormData({
       username: '',
-      password: '',
-      birthdate: ''
+      password: ''
     });
+    setErrors({});
   };
 
   return (
@@ -38,6 +92,21 @@ const Home = () => {
         <div className="login-box">
           <h2 className="login-title">TUPT Counseling Scheduler</h2>
           <div className="login-subtitle">User Authentication</div>
+          
+          {errors.general && (
+            <div style={{ 
+              color: '#ff5252', 
+              fontSize: '14px', 
+              textAlign: 'center', 
+              marginBottom: '15px',
+              padding: '8px',
+              backgroundColor: 'rgba(255, 82, 82, 0.1)',
+              borderRadius: '2px',
+              border: '1px solid rgba(255, 82, 82, 0.3)'
+            }}>
+              {errors.general}
+            </div>
+          )}
           
           <form onSubmit={handleLoginSubmit}>
             <div>
@@ -49,8 +118,10 @@ const Home = () => {
                 value={formData.username}
                 onChange={handleInputChange}
                 placeholder="Enter your username"
+                className={errors.username ? 'error' : ''}
                 required
               />
+              {errors.username && <span className="error-message">{errors.username}</span>}
             </div>
             
             <div>
@@ -62,38 +133,37 @@ const Home = () => {
                 value={formData.password}
                 onChange={handleInputChange}
                 placeholder="Enter your password"
+                className={errors.password ? 'error' : ''}
                 required
               />
-            </div>
-
-            <div>
-              <label htmlFor="birthdate">Birthdate</label>
-              <input
-                type="date"
-                id="birthdate"
-                name="birthdate"
-                value={formData.birthdate}
-                onChange={handleInputChange}
-                required
-              />
+              {errors.password && <span className="error-message">{errors.password}</span>}
             </div>
             
             <div className="buttons">
-              <button type="button" className="btn-clear" onClick={handleClearForm}>
+              <button 
+                type="button" 
+                className="btn-clear" 
+                onClick={handleClearForm}
+                disabled={isLoading}
+              >
                 Clear
               </button>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <a href="#forgot" style={{ fontSize: '13px' }}>Forgot Password?</a>
-                <button type="submit" className="btn-login">
-                  Login
+                <a href="#forgot" style={{ fontSize: '13px', color: 'white' }}>Forgot Password?</a>
+                <button 
+                  type="submit" 
+                  className="btn-login"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Logging in...' : 'Login'}
                 </button>
               </div>
             </div>
             
             <div style={{ marginTop: '15px', textAlign: 'center' }}>
-              <a href="/register" style={{ fontSize: '13px' }}>
+              <Link to="/register" style={{ fontSize: '13px', color: 'white' }}>
                 Create New Account
-              </a>
+              </Link>
             </div>
           </form>
 
@@ -109,4 +179,4 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default Login;

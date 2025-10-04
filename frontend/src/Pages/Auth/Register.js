@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import './Login.css'; // Using the same CSS file
+import { Link, useNavigate } from 'react-router-dom';
+import './Login.css';
 
 const Register = () => {
   const [formData, setFormData] = useState({
+    username: '',
     idNumber: '',
     password: '',
     confirmPassword: '',
     birthdate: ''
   });
 
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState('');
+  const navigate = useNavigate();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -18,6 +22,11 @@ const Register = () => {
       ...prevState,
       [name]: value
     }));
+
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
 
     // Check password strength when password changes
     if (name === 'password') {
@@ -52,32 +61,96 @@ const Register = () => {
     }
   };
 
-  const handleRegisterSubmit = (e) => {
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    }
+
+    if (!formData.idNumber.trim()) {
+      newErrors.idNumber = 'ID Number is required';
+    }
+
+    if (!formData.birthdate) {
+      newErrors.birthdate = 'Birthdate is required';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match!');
+    if (!validateForm()) {
       return;
     }
-    
-    if (formData.password.length < 6) {
-      alert('Password must be at least 6 characters long!');
-      return;
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:5000/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Important for session cookies
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password,
+          id_number: formData.idNumber,
+          birthdate: formData.birthdate
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Registration successful
+        alert('Registration successful! Please login.');
+        navigate('/');
+      } else {
+        // Handle errors from Flask backend
+        if (data.error) {
+          setErrors({ general: data.error });
+        } else if (data.message) {
+          setErrors({ general: data.message });
+        } else {
+          setErrors({ general: 'Registration failed. Please try again.' });
+        }
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      setErrors({ general: 'Network error. Please check if the server is running.' });
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Handle registration logic here
-    console.log('Registration data:', formData);
-    alert('Registration functionality would be implemented here!');
   };
 
   const handleClearForm = () => {
     setFormData({
+      username: '',
       idNumber: '',
       password: '',
       confirmPassword: '',
       birthdate: ''
     });
+    setErrors({});
     setPasswordStrength('');
   };
 
@@ -88,7 +161,37 @@ const Register = () => {
           <h2 className="login-title">TUPT Counseling Scheduler</h2>
           <div className="login-subtitle">Create New Account</div>
           
+          {errors.general && (
+            <div style={{ 
+              color: '#ff5252', 
+              fontSize: '14px', 
+              textAlign: 'center', 
+              marginBottom: '15px',
+              padding: '8px',
+              backgroundColor: 'rgba(255, 82, 82, 0.1)',
+              borderRadius: '2px',
+              border: '1px solid rgba(255, 82, 82, 0.3)'
+            }}>
+              {errors.general}
+            </div>
+          )}
+          
           <form onSubmit={handleRegisterSubmit}>
+            <div>
+              <label htmlFor="username">Username</label>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                value={formData.username}
+                onChange={handleInputChange}
+                placeholder="Enter your username"
+                className={errors.username ? 'error' : ''}
+                required
+              />
+              {errors.username && <span className="error-message">{errors.username}</span>}
+            </div>
+
             <div>
               <label htmlFor="idNumber">ID Number</label>
               <input
@@ -98,8 +201,10 @@ const Register = () => {
                 value={formData.idNumber}
                 onChange={handleInputChange}
                 placeholder="Enter your ID number"
+                className={errors.idNumber ? 'error' : ''}
                 required
               />
+              {errors.idNumber && <span className="error-message">{errors.idNumber}</span>}
             </div>
             
             <div>
@@ -110,8 +215,10 @@ const Register = () => {
                 name="birthdate"
                 value={formData.birthdate}
                 onChange={handleInputChange}
+                className={errors.birthdate ? 'error' : ''}
                 required
               />
+              {errors.birthdate && <span className="error-message">{errors.birthdate}</span>}
             </div>
             
             <div>
@@ -123,11 +230,13 @@ const Register = () => {
                 value={formData.password}
                 onChange={handleInputChange}
                 placeholder="Create a password"
+                className={errors.password ? 'error' : ''}
                 required
               />
               {passwordStrength && (
                 <div className={`password-strength strength-${passwordStrength}`}></div>
               )}
+              {errors.password && <span className="error-message">{errors.password}</span>}
             </div>
 
             <div>
@@ -139,18 +248,29 @@ const Register = () => {
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
                 placeholder="Confirm your password"
+                className={errors.confirmPassword ? 'error' : ''}
                 required
               />
+              {errors.confirmPassword && <span className="error-message">{errors.confirmPassword}</span>}
             </div>
             
             <div className="buttons">
-              <button type="button" className="btn-clear" onClick={handleClearForm}>
+              <button 
+                type="button" 
+                className="btn-clear" 
+                onClick={handleClearForm}
+                disabled={isLoading}
+              >
                 Clear
               </button>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <Link to="/" style={{ fontSize: '13px', color: 'white' }}>Back to Login</Link>
-                <button type="submit" className="btn-login">
-                  Register
+                <button 
+                  type="submit" 
+                  className="btn-login"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Registering...' : 'Register'}
                 </button>
               </div>
             </div>

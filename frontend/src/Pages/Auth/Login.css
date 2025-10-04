@@ -377,3 +377,32 @@
   color: rgba(255, 255, 255, 0.7);
   font-size: 13px;
 }
+
+/* Error styles */
+.error {
+  border-color: #ff5252 !important;
+  background: rgba(255, 82, 82, 0.1) !important;
+}
+
+.error-message {
+  color: #ff5252;
+  font-size: 12px;
+  display: block;
+  margin-top: -5px;
+  margin-bottom: 10px;
+}
+
+/* Loading state styles */
+.btn-clear:disabled,
+.btn-login:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.btn-clear:disabled:hover,
+.btn-login:disabled:hover {
+  background: #c62828;
+  transform: none !important;
+  box-shadow: none !important;
+}
