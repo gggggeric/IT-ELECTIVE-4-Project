@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import './Home.css';
+import './Login.css';
 
 const Home = () => {
   const [formData, setFormData] = useState({
@@ -91,7 +91,7 @@ const Home = () => {
             </div>
             
             <div style={{ marginTop: '15px', textAlign: 'center' }}>
-              <a href="#create-account" style={{ fontSize: '13px' }}>
+              <a href="/register" style={{ fontSize: '13px' }}>
                 Create New Account
               </a>
             </div>

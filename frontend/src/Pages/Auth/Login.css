@@ -302,3 +302,78 @@
     justify-content: center;
   }
 }
+
+/* Add these styles to your existing Login.css */
+
+/* Password strength indicator */
+.password-strength {
+  height: 5px;
+  margin-top: 5px;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.strength-weak {
+  width: 25%;
+  background-color: #ff5252;
+}
+
+.strength-medium {
+  width: 50%;
+  background-color: #ffb142;
+}
+
+.strength-strong {
+  width: 100%;
+  background-color: #2ed573;
+}
+
+/* Register specific styles */
+.register-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.register-option {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 2px;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.register-option:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.register-divider {
+  margin: 15px 0;
+  position: relative;
+  text-align: center;
+}
+
+.register-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.register-divider span {
+  background: linear-gradient(to bottom, #605051, #5f3739);
+  padding: 0 10px;
+  position: relative;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+}

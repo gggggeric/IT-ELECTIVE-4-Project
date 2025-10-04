@@ -1,5 +1,5 @@
 import React from 'react';
-import './Home.css'; // Reusing the same CSS
+import './Auth/Login.css'; // Reusing the same CSS
 
 const Info = () => {
   return (
