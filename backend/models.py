@@ -29,7 +29,7 @@ class User(UserMixin):
             'id_number': self.id_number,
             'birthdate': self.birthdate,
             '_id': str(self._id),
-            'created_at': self.created_at
+            'created_at': self.created_at.isoformat() if isinstance(self.created_at, datetime) else self.created_at
         }
 
     @classmethod
@@ -41,4 +41,57 @@ class User(UserMixin):
             birthdate=data.get('birthdate'),
             _id=data.get('_id', ObjectId()),
             created_at=data.get('created_at')
+        )
+
+
+class Appointment:
+    def __init__(self, user_id, date, preferred_time, concern_type, status="Scheduled", _id=None, created_at=None):
+        self.user_id = user_id
+        self.date = date
+        self.preferred_time = preferred_time
+        self.concern_type = concern_type
+        self.status = status
+        self._id = _id or ObjectId()
+        self.created_at = created_at or datetime.utcnow()
+
+    def to_dict(self):
+        # Use the actual created_at datetime to generate the formatted string
+        current_created_at = self.created_at
+        if isinstance(current_created_at, str):
+            try:
+                current_created_at = datetime.fromisoformat(current_created_at.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                current_created_at = datetime.utcnow()
+        
+        formatted_created_at = current_created_at.strftime('%B %d, %Y at %I:%M %p')
+        
+        return {
+            'user_id': self.user_id,
+            'date': self.date,
+            'preferred_time': self.preferred_time,
+            'concern_type': self.concern_type,
+            'status': self.status,
+            '_id': str(self._id),
+            'created_at': current_created_at.isoformat() if isinstance(current_created_at, datetime) else current_created_at,
+            'formatted_created_at': formatted_created_at
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        # Handle created_at conversion from string to datetime if needed
+        created_at = data.get('created_at')
+        if created_at and isinstance(created_at, str):
+            try:
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                created_at = datetime.utcnow()
+        
+        return cls(
+            user_id=data['user_id'],
+            date=data['date'],
+            preferred_time=data['preferred_time'],
+            concern_type=data['concern_type'],
+            status=data.get('status', 'Scheduled'),
+            _id=data.get('_id', ObjectId()),
+            created_at=created_at
         )

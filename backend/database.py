@@ -1,6 +1,6 @@
 from flask_pymongo import PyMongo
 from bson import ObjectId
-from models import User
+from models import User, Appointment
 
 mongo = PyMongo()
 
@@ -56,3 +56,25 @@ def find_user_by_id(user_id):
     except Exception as e:
         print(f"❌ Error finding user by ID: {e}")
         return None
+
+def insert_appointment(appointment):
+    try:
+        result = mongo.db.appointments.insert_one(appointment.to_dict())
+        print(f"✅ Appointment inserted with ID: {result.inserted_id}")
+        return result.inserted_id
+    except Exception as e:
+        print(f"❌ Error inserting appointment: {e}")
+        return None
+
+def find_appointments_by_user_id(user_id):
+    try:
+        print(f"🔍 Searching for appointments for user: {user_id}")
+        appointments_data = mongo.db.appointments.find({'user_id': user_id}).sort('date', -1)
+        appointments = []
+        for appointment_data in appointments_data:
+            appointments.append(Appointment.from_dict(appointment_data))
+        print(f"✅ Found {len(appointments)} appointments for user {user_id}")
+        return appointments
+    except Exception as e:
+        print(f"❌ Error finding appointments by user ID: {e}")
+        return []

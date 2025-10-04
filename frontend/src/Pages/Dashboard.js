@@ -12,6 +12,7 @@ const Dashboard = () => {
   });
   const [scheduledAppointments, setScheduledAppointments] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -20,13 +21,83 @@ const Dashboard = () => {
     const user = localStorage.getItem('currentUser');
 
     if (isAuthenticated && user) {
-      setUserData(JSON.parse(user));
+      const userObj = JSON.parse(user);
+      setUserData(userObj);
+      loadUserAppointments(userObj.user_id);
       setIsLoading(false);
     } else {
       // Redirect to login if not authenticated
       navigate('/');
     }
   }, [navigate]);
+
+  // Helper function to format dates safely
+  const formatDateSafely = (dateString) => {
+    if (!dateString) {
+      // Return current time if no date string provided
+      const now = new Date();
+      return now.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    
+    // If it's already a formatted string from the backend, use it directly
+    if (typeof dateString === 'string' && (dateString.includes('at') || dateString.includes('AM') || dateString.includes('PM'))) {
+      return dateString;
+    }
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        // Return current time if date is invalid
+        const now = new Date();
+        return now.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      // Return current time if there's an error
+      const now = new Date();
+      return now.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+  };
+
+  const loadUserAppointments = async (userId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/appointments/${userId}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Appointments loaded:', data.appointments);
+        setScheduledAppointments(data.appointments || []);
+      } else {
+        console.error('Error loading appointments:', response.status);
+      }
+    } catch (error) {
+      console.error('Error loading appointments:', error);
+    }
+  };
 
   const handleLogout = () => {
     // Clear localStorage
@@ -43,7 +114,7 @@ const Dashboard = () => {
     }));
   };
 
-  const handleScheduleAppointment = (e) => {
+  const handleScheduleAppointment = async (e) => {
     e.preventDefault();
     
     if (!appointmentData.date || !appointmentData.time || !appointmentData.concern) {
@@ -51,24 +122,48 @@ const Dashboard = () => {
       return;
     }
 
-    const newAppointment = {
-      id: Date.now(),
-      date: appointmentData.date,
-      time: appointmentData.time,
-      concern: appointmentData.concern,
-      status: 'Scheduled'
-    };
+    setIsSubmitting(true);
 
-    setScheduledAppointments(prev => [newAppointment, ...prev]);
-    
-    // Reset form
-    setAppointmentData({
-      date: '',
-      time: '',
-      concern: ''
-    });
+    try {
+      const user = JSON.parse(localStorage.getItem('currentUser'));
+      const userId = user.user_id;
+      
+      const response = await fetch('http://localhost:5000/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          date: appointmentData.date,
+          preferred_time: appointmentData.time,
+          concern_type: appointmentData.concern
+        }),
+      });
 
-    alert('Appointment scheduled successfully!');
+      const data = await response.json();
+
+      if (response.ok) {
+        // Refresh appointments list from backend
+        await loadUserAppointments(userId);
+        
+        // Reset form
+        setAppointmentData({
+          date: '',
+          time: '',
+          concern: ''
+        });
+
+        alert('Appointment scheduled successfully!');
+      } else {
+        alert(data.error || 'Failed to schedule appointment');
+      }
+    } catch (error) {
+      console.error('Appointment scheduling error:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClearAppointment = () => {
@@ -273,11 +368,16 @@ const Dashboard = () => {
                       type="button" 
                       className="btn-clear" 
                       onClick={handleClearAppointment}
+                      disabled={isSubmitting}
                     >
                       Clear
                     </button>
-                    <button type="submit" className="btn-login">
-                      Schedule Appointment
+                    <button 
+                      type="submit" 
+                      className="btn-login"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Scheduling...' : 'Schedule Appointment'}
                     </button>
                   </div>
                 </form>
@@ -290,16 +390,19 @@ const Dashboard = () => {
                 {scheduledAppointments.length > 0 ? (
                   <div className="appointments-list">
                     {scheduledAppointments.map(appointment => (
-                      <div key={appointment.id} className="appointment-item">
+                      <div key={appointment._id} className="appointment-item">
                         <div className="appointment-header">
                           <span className="appointment-date">{appointment.date}</span>
-                          <span className="appointment-time">{appointment.time}</span>
+                          <span className="appointment-time">{appointment.preferred_time}</span>
                         </div>
                         <div className="appointment-details">
-                          <span className="appointment-concern">{appointment.concern}</span>
+                          <span className="appointment-concern">{appointment.concern_type}</span>
                           <span className={`appointment-status ${appointment.status.toLowerCase()}`}>
                             {appointment.status}
                           </span>
+                        </div>
+                        <div className="appointment-meta">
+                          <small>Scheduled on: {appointment.formatted_created_at || formatDateSafely(appointment.created_at)}</small>
                         </div>
                       </div>
                     ))}

@@ -1,6 +1,6 @@
 from flask import jsonify, request
-from database import find_user_by_username, find_user_by_id_number, insert_user
-from models import User
+from database import find_user_by_username, find_user_by_id_number, insert_user, insert_appointment, find_appointments_by_user_id
+from models import User, Appointment
 
 def init_routes(app):
     @app.route('/')
@@ -112,7 +112,8 @@ def init_routes(app):
                 'user': {
                     'username': user.username,
                     'id_number': user.id_number,
-                    'birthdate': user.birthdate
+                    'birthdate': user.birthdate,
+                    'user_id': str(user._id)
                 }
             }), 200
             
@@ -123,10 +124,81 @@ def init_routes(app):
                 'error': str(e)
             }), 500
 
+    @app.route('/appointments', methods=['POST'])
+    def create_appointment():
+        try:
+            data = request.get_json()
+            
+            # Validate required fields
+            if not data:
+                return jsonify({
+                    'message': 'Invalid request data',
+                    'error': 'No JSON data provided'
+                }), 400
+            
+            required_fields = ['user_id', 'date', 'preferred_time', 'concern_type']
+            missing_fields = [field for field in required_fields if not data.get(field)]
+            
+            if missing_fields:
+                return jsonify({
+                    'message': 'Missing required fields',
+                    'error': f'Missing fields: {", ".join(missing_fields)}',
+                    'missing_fields': missing_fields
+                }), 400
+            
+            # Create new appointment
+            appointment = Appointment(
+                user_id=data['user_id'],
+                date=data['date'],
+                preferred_time=data['preferred_time'],
+                concern_type=data['concern_type'],
+                status=data.get('status', 'Scheduled')
+            )
+            
+            # Save appointment to database
+            result = insert_appointment(appointment)
+            
+            if result:
+                print(f"✅ Appointment created for user {data['user_id']} on {data['date']} at {data['preferred_time']}")
+                return jsonify({
+                    'message': 'Appointment scheduled successfully!',
+                    'appointment_id': str(appointment._id),
+                    'appointment': appointment.to_dict()
+                }), 201
+            else:
+                return jsonify({
+                    'message': 'Appointment scheduling failed',
+                    'error': 'Failed to create appointment in database'
+                }), 500
+            
+        except Exception as e:
+            print(f"❌ Appointment scheduling error: {e}")
+            return jsonify({
+                'message': 'Appointment scheduling error',
+                'error': str(e)
+            }), 500
+
+    @app.route('/appointments/<user_id>', methods=['GET'])
+    def get_user_appointments(user_id):
+        try:
+            appointments = find_appointments_by_user_id(user_id)
+            
+            print(f"✅ Retrieved {len(appointments)} appointments for user {user_id}")
+            
+            return jsonify({
+                'message': 'Appointments retrieved successfully',
+                'appointments': [appointment.to_dict() for appointment in appointments]
+            }), 200
+            
+        except Exception as e:
+            print(f"❌ Error retrieving appointments: {e}")
+            return jsonify({
+                'message': 'Error retrieving appointments',
+                'error': str(e)
+            }), 500
+
     @app.route('/dashboard')
     def dashboard():
-        # Simple endpoint that doesn't require authentication
-        # Frontend will handle authentication via localStorage
         return jsonify({
             'message': 'Dashboard endpoint',
             'note': 'Authentication handled by frontend localStorage'
@@ -134,7 +206,6 @@ def init_routes(app):
 
     @app.route('/user/profile')
     def user_profile():
-        # Simple endpoint that doesn't require authentication
         return jsonify({
             'message': 'User profile endpoint',
             'note': 'Authentication handled by frontend localStorage'
@@ -146,3 +217,20 @@ def init_routes(app):
             'status': 'healthy',
             'message': 'API is running'
         })
+
+    # Test endpoint to check if appointments collection exists
+    @app.route('/test-appointments')
+    def test_appointments():
+        try:
+            from database import mongo
+            # Try to access appointments collection
+            appointments_count = mongo.db.appointments.count_documents({})
+            return jsonify({
+                'message': 'Appointments collection is accessible',
+                'appointments_count': appointments_count
+            })
+        except Exception as e:
+            return jsonify({
+                'message': 'Error accessing appointments collection',
+                'error': str(e)
+            }), 500
