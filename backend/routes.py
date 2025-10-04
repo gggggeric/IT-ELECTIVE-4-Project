@@ -1,6 +1,5 @@
 from flask import jsonify, request
-from flask_login import login_user, logout_user, login_required, current_user
-from database import mongo, find_user_by_username, find_user_by_id_number, find_user_by_id, insert_user
+from database import find_user_by_username, find_user_by_id_number, insert_user
 from models import User
 
 def init_routes(app):
@@ -13,12 +12,6 @@ def init_routes(app):
 
     @app.route('/register', methods=['POST'])
     def register():
-        if current_user.is_authenticated:
-            return jsonify({
-                'message': 'User already authenticated',
-                'error': 'Already logged in'
-            }), 400
-        
         try:
             data = request.get_json()
             
@@ -75,7 +68,12 @@ def init_routes(app):
             if result:
                 return jsonify({
                     'message': 'Registration successful! Please login.',
-                    'user_id': str(user._id)
+                    'user_id': str(user._id),
+                    'user': {
+                        'username': user.username,
+                        'id_number': user.id_number,
+                        'birthdate': user.birthdate
+                    }
                 }), 201
             else:
                 return jsonify({
@@ -91,15 +89,6 @@ def init_routes(app):
 
     @app.route('/login', methods=['POST'])
     def login():
-        if current_user.is_authenticated:
-            return jsonify({
-                'message': 'Already authenticated',
-                'user': {
-                    'username': current_user.username,
-                    'id_number': current_user.id_number
-                }
-            }), 200
-        
         try:
             data = request.get_json()
             
@@ -116,7 +105,7 @@ def init_routes(app):
                     'error': 'Invalid username or password'
                 }), 401
             
-            login_user(user, remember=data.get('remember', True))
+            print(f"✅ User {user.username} logged in successfully")
             
             return jsonify({
                 'message': 'Login successful',
@@ -128,39 +117,27 @@ def init_routes(app):
             }), 200
             
         except Exception as e:
+            print(f"❌ Login error: {e}")
             return jsonify({
                 'message': 'Login error',
                 'error': str(e)
             }), 500
 
     @app.route('/dashboard')
-    @login_required
     def dashboard():
+        # Simple endpoint that doesn't require authentication
+        # Frontend will handle authentication via localStorage
         return jsonify({
-            'message': 'Dashboard data',
-            'user': {
-                'username': current_user.username,
-                'id_number': current_user.id_number,
-                'birthdate': current_user.birthdate
-            }
+            'message': 'Dashboard endpoint',
+            'note': 'Authentication handled by frontend localStorage'
         })
 
-    @app.route('/logout', methods=['POST'])
-    @login_required
-    def logout():
-        logout_user()
-        return jsonify({'message': 'Logout successful'}), 200
-
     @app.route('/user/profile')
-    @login_required
     def user_profile():
+        # Simple endpoint that doesn't require authentication
         return jsonify({
-            'user': {
-                'username': current_user.username,
-                'id_number': current_user.id_number,
-                'birthdate': current_user.birthdate,
-                'created_at': current_user.created_at.isoformat() if current_user.created_at else None
-            }
+            'message': 'User profile endpoint',
+            'note': 'Authentication handled by frontend localStorage'
         })
 
     @app.route('/health')

@@ -19,7 +19,6 @@ const Login = () => {
       [name]: value
     }));
 
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -31,7 +30,6 @@ const Login = () => {
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     
-    // Basic validation
     if (!formData.username || !formData.password) {
       setErrors({ general: 'Username and password are required' });
       return;
@@ -45,7 +43,6 @@ const Login = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Important for session cookies
         body: JSON.stringify({
           username: formData.username,
           password: formData.password
@@ -55,13 +52,14 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Login successful
+        // Store user data in localStorage
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        localStorage.setItem('isAuthenticated', 'true');
+        
         console.log('Login successful:', data);
         alert('Login successful!');
-        // Redirect to dashboard
         navigate('/dashboard');
       } else {
-        // Handle errors from Flask backend
         if (data.error) {
           setErrors({ general: data.error });
         } else if (data.message) {
@@ -167,7 +165,6 @@ const Login = () => {
             </div>
           </form>
 
-          {/* For more information link */}
           <div className="more-info-container">
             <Link to="/info" className="more-info-link">
               For more information click here

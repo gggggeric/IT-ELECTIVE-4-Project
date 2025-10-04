@@ -1,7 +1,6 @@
 from flask import Flask
-from flask_login import LoginManager
 from flask_cors import CORS
-from database import mongo, find_user_by_id, init_app
+from database import init_app
 from routes import init_routes
 import os
 from dotenv import load_dotenv
@@ -13,7 +12,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
 
 # Enable CORS for React frontend
-CORS(app, supports_credentials=True)
+CORS(app)
 
 # MongoDB configuration from environment variables
 MONGO_USERNAME = os.environ.get('MONGO_USERNAME')
@@ -34,30 +33,14 @@ app.config['MONGO_DB_NAME'] = MONGO_DB_NAME
 
 # Initialize extensions
 try:
-    init_app(app)  # Use the init_app function from database.py
+    init_app(app)
     print("🎉 MongoDB initialization completed successfully!")
 except Exception as e:
     print(f"💥 CRITICAL: Failed to initialize MongoDB: {e}")
     print("💡 Please check your credentials and connection")
     exit(1)
 
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-login_manager.session_protection = "strong"
-
-@login_manager.user_loader
-def load_user(user_id):
-    return find_user_by_id(user_id)  # Use the function from database.py
-
-@login_manager.unauthorized_handler
-def unauthorized():
-    return jsonify({
-        'message': 'Authentication required',
-        'error': 'Please login to access this resource'
-    }), 401
-
-# Initialize routes
+# Initialize routes (no Flask-Login needed)
 init_routes(app)
 
 @app.route('/test-db')
@@ -80,5 +63,4 @@ if __name__ == '__main__':
     print(f"📊 Database: {MONGO_DB_NAME}")
     print(f"👤 MongoDB User: {MONGO_USERNAME}")
     print(f"🌐 Server will run on: http://127.0.0.1:5000")
-    print(f"🔗 CORS enabled for React frontend")
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -44,10 +44,15 @@ def find_user_by_id_number(id_number):
 
 def find_user_by_id(user_id):
     try:
+        print(f"🔍 Searching for user with ID: {user_id}")
+        # Convert string to ObjectId
         user_data = mongo.db.users.find_one({'_id': ObjectId(user_id)})
         if user_data:
+            print(f"✅ User found in database: {user_data.get('username')}")
             return User.from_dict(user_data)
-        return None
+        else:
+            print(f"❌ No user found with ID: {user_id}")
+            return None
     except Exception as e:
-        print(f"Error finding user by ID: {e}")
+        print(f"❌ Error finding user by ID: {e}")
         return None
