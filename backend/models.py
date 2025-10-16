@@ -4,11 +4,12 @@ import bcrypt
 from datetime import datetime
 
 class User(UserMixin):
-    def __init__(self, username, password_hash, id_number=None, birthdate=None, _id=None, created_at=None):
+    def __init__(self, username, password_hash, id_number=None, birthdate=None, role="user", _id=None, created_at=None):
         self.username = username
         self.password_hash = password_hash
         self.id_number = id_number
         self.birthdate = birthdate
+        self.role = role  # 'user' or 'admin'
         self._id = _id or ObjectId()
         self.created_at = created_at or datetime.utcnow()
 
@@ -28,6 +29,7 @@ class User(UserMixin):
             'password_hash': self.password_hash,
             'id_number': self.id_number,
             'birthdate': self.birthdate,
+            'role': self.role,
             '_id': str(self._id),
             'created_at': self.created_at.isoformat() if isinstance(self.created_at, datetime) else self.created_at
         }
@@ -39,18 +41,19 @@ class User(UserMixin):
             password_hash=data['password_hash'],
             id_number=data.get('id_number'),
             birthdate=data.get('birthdate'),
+            role=data.get('role', 'user'),  # Default to 'user' if not specified
             _id=data.get('_id', ObjectId()),
             created_at=data.get('created_at')
         )
 
 
 class Appointment:
-    def __init__(self, user_id, date, preferred_time, concern_type, status="Scheduled", _id=None, created_at=None):
+    def __init__(self, user_id, date, preferred_time, concern_type, status="Pending", _id=None, created_at=None):
         self.user_id = user_id
         self.date = date
         self.preferred_time = preferred_time
         self.concern_type = concern_type
-        self.status = status
+        self.status = status  # 'Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed'
         self._id = _id or ObjectId()
         self.created_at = created_at or datetime.utcnow()
 
@@ -91,7 +94,7 @@ class Appointment:
             date=data['date'],
             preferred_time=data['preferred_time'],
             concern_type=data['concern_type'],
-            status=data.get('status', 'Scheduled'),
+            status=data.get('status', 'Pending'),  # Default to 'Pending'
             _id=data.get('_id', ObjectId()),
             created_at=created_at
         )

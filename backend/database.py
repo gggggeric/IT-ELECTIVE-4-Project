@@ -16,10 +16,29 @@ def test_connection():
 
 def insert_user(user):
     try:
-        result = mongo.db.users.insert_one(user.to_dict())
-        return result.inserted_id
+        print(f"🔍 Attempting to insert user: {user.username}")
+        user_dict = user.to_dict()
+        print(f"📝 User data to insert: {user_dict}")
+        
+        # Check if database connection is working
+        try:
+            mongo.db.command('ping')
+            print("✅ Database connection is active")
+        except Exception as e:
+            print(f"❌ Database connection failed: {e}")
+            return None
+        
+        # Check if users collection exists
+        collections = mongo.db.list_collection_names()
+        print(f"📁 Available collections: {collections}")
+        
+        result = mongo.db.users.insert_one(user_dict)
+        print(f"✅ User inserted successfully with ID: {result.inserted_id}")
+        return str(result.inserted_id)
     except Exception as e:
-        print(f"Error inserting user: {e}")
+        print(f"❌ Error inserting user: {e}")
+        import traceback
+        print(f"🔍 Stack trace: {traceback.format_exc()}")
         return None
 
 def find_user_by_username(username):
@@ -77,4 +96,25 @@ def find_appointments_by_user_id(user_id):
         return appointments
     except Exception as e:
         print(f"❌ Error finding appointments by user ID: {e}")
+        return []
+
+def update_appointment_status(appointment_id, new_status):
+    """Update the status of an appointment"""
+    try:
+        result = mongo.db.appointments.update_one(
+            {'_id': ObjectId(appointment_id)},
+            {'$set': {'status': new_status}}
+        )
+        return result.modified_count > 0
+    except Exception as e:
+        print(f"Error updating appointment status: {e}")
+        return False
+
+def get_all_appointments():
+    """Get all appointments (for admin/counselor view)"""
+    try:
+        appointments = mongo.db.appointments.find().sort('created_at', -1)
+        return [Appointment.from_dict(appointment) for appointment in appointments]
+    except Exception as e:
+        print(f"Error getting all appointments: {e}")
         return []

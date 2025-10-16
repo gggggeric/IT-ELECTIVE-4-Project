@@ -104,12 +104,17 @@ const Register = () => {
     setIsLoading(true);
 
     try {
+      console.log("📨 Sending registration request...", {
+        username: formData.username,
+        id_number: formData.idNumber,
+        birthdate: formData.birthdate
+      });
+
       const response = await fetch('http://localhost:5000/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Important for session cookies
         body: JSON.stringify({
           username: formData.username,
           password: formData.password,
@@ -118,7 +123,10 @@ const Register = () => {
         }),
       });
 
+      console.log("📨 Response status:", response.status);
+      
       const data = await response.json();
+      console.log("📨 Response data:", data);
 
       if (response.ok) {
         // Registration successful
@@ -126,6 +134,7 @@ const Register = () => {
         navigate('/');
       } else {
         // Handle errors from Flask backend
+        console.error("❌ Registration failed:", data);
         if (data.error) {
           setErrors({ general: data.error });
         } else if (data.message) {
@@ -135,7 +144,7 @@ const Register = () => {
         }
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('💥 Registration error:', error);
       setErrors({ general: 'Network error. Please check if the server is running.' });
     } finally {
       setIsLoading(false);
