@@ -27,54 +27,60 @@ const Login = () => {
     }
   };
 
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!formData.username || !formData.password) {
-      setErrors({ general: 'Username and password are required' });
-      return;
-    }
+const handleLoginSubmit = async (e) => {
+  e.preventDefault();
+  
+  if (!formData.username || !formData.password) {
+    setErrors({ general: 'Username and password are required' });
+    return;
+  }
 
-    setIsLoading(true);
+  setIsLoading(true);
 
-    try {
-      const response = await fetch('http://localhost:5000/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          password: formData.password
-        }),
-      });
+  try {
+    const response = await fetch('http://localhost:5000/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: formData.username,
+        password: formData.password
+      }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (response.ok) {
-        // Store user data in localStorage
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
-        localStorage.setItem('isAuthenticated', 'true');
-        
-        console.log('Login successful:', data);
-        alert('Login successful!');
-        navigate('/dashboard');
+    if (response.ok) {
+      // Store user data in localStorage
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
+      localStorage.setItem('isAuthenticated', 'true');
+      
+      console.log('Login successful:', data);
+      alert('Login successful!');
+      
+      // Check user role and redirect accordingly
+      if (data.user.role === 'admin') {
+        navigate('/adminDashboard');
       } else {
-        if (data.error) {
-          setErrors({ general: data.error });
-        } else if (data.message) {
-          setErrors({ general: data.message });
-        } else {
-          setErrors({ general: 'Login failed. Please try again.' });
-        }
+        navigate('/dashboard');
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      setErrors({ general: 'Network error. Please check if the server is running.' });
-    } finally {
-      setIsLoading(false);
+    } else {
+      if (data.error) {
+        setErrors({ general: data.error });
+      } else if (data.message) {
+        setErrors({ general: data.message });
+      } else {
+        setErrors({ general: 'Login failed. Please try again.' });
+      }
     }
-  };
+  } catch (error) {
+    console.error('Login error:', error);
+    setErrors({ general: 'Network error. Please check if the server is running.' });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleClearForm = () => {
     setFormData({
