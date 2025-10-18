@@ -9,13 +9,17 @@ const AdminDashboard = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState('All');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   // Status options
   const statusOptions = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed'];
 
   useEffect(() => {
-    // Use 'currentUser' to match what's stored in login
+    checkAuthentication();
+  }, [navigate]);
+
+  const checkAuthentication = () => {
     const userData = localStorage.getItem('currentUser');
     const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
     
@@ -25,8 +29,8 @@ const AdminDashboard = () => {
       
       // Check if user is admin
       if (userObj.role !== 'admin') {
-        alert('Access denied. Admin privileges required.');
-        navigate('/dashboard');
+        setError('Access denied. Admin privileges required.');
+        setTimeout(() => navigate('/dashboard'), 2000);
         return;
       }
       
@@ -34,22 +38,29 @@ const AdminDashboard = () => {
     } else {
       navigate('/');
     }
-  }, [navigate]);
+  };
 
   const fetchAllAppointments = async () => {
     try {
       setIsLoading(true);
+      setError('');
       const response = await fetch('http://localhost:5000/all-appointments');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       
       if (response.ok) {
-        setAppointments(data.appointments);
-        setFilteredAppointments(data.appointments);
+        setAppointments(data.appointments || []);
+        applyFilters(data.appointments || [], statusFilter, selectedDate);
       } else {
-        console.error('Failed to fetch appointments:', data.error);
+        setError(data.error || 'Failed to fetch appointments');
       }
     } catch (error) {
       console.error('Error fetching appointments:', error);
+      setError('Failed to connect to server. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -57,6 +68,16 @@ const AdminDashboard = () => {
 
   const handleStatusUpdate = async (appointmentId, newStatus) => {
     try {
+      setError('');
+      
+      // Client-side validation for pending appointments
+      const appointment = appointments.find(apt => apt._id === appointmentId);
+      if (appointment && appointment.status === 'Pending' && !['Approved', 'Rejected'].includes(newStatus)) {
+        setError('Pending appointments can only be approved or rejected.');
+        alert('Error: Pending appointments can only be approved or rejected.');
+        return;
+      }
+
       const response = await fetch(`http://localhost:5000/appointments/${appointmentId}/status`, {
         method: 'PUT',
         headers: {
@@ -68,36 +89,69 @@ const AdminDashboard = () => {
       const data = await response.json();
 
       if (response.ok) {
+        // Update local state instead of refetching all appointments
+        setAppointments(prevAppointments => 
+          prevAppointments.map(apt => 
+            apt._id === appointmentId 
+              ? { ...apt, status: newStatus }
+              : apt
+          )
+        );
+        
+        // Update filtered appointments as well
+        setFilteredAppointments(prevFiltered => 
+          prevFiltered.map(apt => 
+            apt._id === appointmentId 
+              ? { ...apt, status: newStatus }
+              : apt
+          )
+        );
+        
+        // Show success message
         alert(`Appointment ${newStatus.toLowerCase()} successfully!`);
-        fetchAllAppointments(); // Refresh the list
       } else {
-        alert(`Failed to update appointment: ${data.error}`);
+        throw new Error(data.error || 'Failed to update appointment');
       }
     } catch (error) {
       console.error('Error updating appointment:', error);
-      alert('Error updating appointment status');
+      setError(error.message);
+      alert(`Error: ${error.message}`);
     }
+  };
+
+  const applyFilters = (appts, statusFilter, date) => {
+    let filtered = appts;
+    
+    // Apply status filter
+    if (statusFilter !== 'All') {
+      filtered = filtered.filter(apt => apt.status === statusFilter);
+    }
+    
+    // Apply date filter
+    if (date) {
+      filtered = filtered.filter(apt => {
+        const aptDate = new Date(apt.date);
+        return aptDate.toDateString() === date.toDateString();
+      });
+    }
+    
+    setFilteredAppointments(filtered);
   };
 
   const handleStatusFilterChange = (e) => {
     const filter = e.target.value;
     setStatusFilter(filter);
-    
-    if (filter === 'All') {
-      setFilteredAppointments(appointments);
-    } else {
-      setFilteredAppointments(appointments.filter(apt => apt.status === filter));
-    }
+    applyFilters(appointments, filter, selectedDate);
   };
 
   const handleDateChange = (date) => {
     setSelectedDate(date);
-    // Filter appointments by selected date
-    const filtered = appointments.filter(apt => {
-      const aptDate = new Date(apt.date);
-      return aptDate.toDateString() === date.toDateString();
-    });
-    setFilteredAppointments(filtered);
+    applyFilters(appointments, statusFilter, date);
+  };
+
+  const handleStatusFilterClick = (status) => {
+    setStatusFilter(status);
+    applyFilters(appointments, status, selectedDate);
   };
 
   const getAppointmentsForDate = (date) => {
@@ -129,12 +183,9 @@ const AdminDashboard = () => {
   };
 
   const handleLogout = () => {
-    // Clear all authentication data
     localStorage.removeItem('currentUser');
     localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('user'); // Remove any existing 'user' key as well
-    
-    // Navigate to login page
+    localStorage.removeItem('user');
     navigate('/');
   };
 
@@ -225,17 +276,6 @@ const AdminDashboard = () => {
             <div className="appointment-dot"></div>
             <span>Has Appointments</span>
           </div>
-          <div className="logout-section">
-            <div className="admin-welcome">
-              Welcome, Admin {user?.username}
-            </div>
-            <button 
-              onClick={handleLogout}
-              className="logout-btn"
-            >
-              Logout
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -255,6 +295,21 @@ const AdminDashboard = () => {
     );
   }
 
+  if (error && error.includes('Access denied')) {
+    return (
+      <div className="dashboard-gradient-background">
+        <div className="dashboard-container">
+          <div className="dashboard-box equal-box">
+            <div style={{ textAlign: 'center', color: 'white' }}>
+              <div style={{ color: '#ff6b6b', marginBottom: '20px' }}>{error}</div>
+              <p>Redirecting to user dashboard...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="dashboard-gradient-background">
       <div className="dashboard-container">
@@ -263,7 +318,15 @@ const AdminDashboard = () => {
             {/* Left Column - Calendar and Quick Stats */}
             <div className="column">
               <div className="dashboard-box equal-box">
-                <h2 className="dashboard-title">Admin Dashboard</h2>
+                <div className="admin-header">
+                  <h2 className="dashboard-title">Admin Dashboard</h2>
+                  <div className="admin-welcome">
+                    Welcome, {user?.username}
+                    <button onClick={handleLogout} className="logout-btn">
+                      Logout
+                    </button>
+                  </div>
+                </div>
                 
                 {/* Quick Stats */}
                 <div style={{ marginBottom: '20px' }}>
@@ -310,24 +373,39 @@ const AdminDashboard = () => {
               <div className="dashboard-box equal-box">
                 <h2 className="dashboard-title">Appointments Management</h2>
                 
+                {error && !error.includes('Access denied') && (
+                  <div className="error-message" style={{ 
+                    background: 'rgba(255, 107, 107, 0.2)', 
+                    color: '#FF6B6B', 
+                    padding: '10px', 
+                    borderRadius: '5px', 
+                    marginBottom: '15px',
+                    border: '1px solid #FF6B6B'
+                  }}>
+                    {error}
+                  </div>
+                )}
+                
                 {/* Filter Controls */}
                 <div style={{ marginBottom: '20px' }}>
-                  <label>Filter by Status:</label>
-                  <select 
-                    value={statusFilter} 
-                    onChange={handleStatusFilterChange}
-                    style={{ marginBottom: '15px' }}
-                  >
-                    {statusOptions.map(status => (
-                      <option key={status} value={status}>{status}</option>
-                    ))}
-                  </select>
+                  <div className="filter-controls">
+                    <label>Filter by Status:</label>
+                    <select 
+                      value={statusFilter} 
+                      onChange={handleStatusFilterChange}
+                      className="status-select"
+                    >
+                      {statusOptions.map(status => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
+                    </select>
+                  </div>
                   
                   <div className="status-filters">
                     {statusOptions.filter(s => s !== 'All').map(status => (
                       <button
                         key={status}
-                        onClick={() => setStatusFilter(status)}
+                        onClick={() => handleStatusFilterClick(status)}
                         className={`status-filter-btn ${statusFilter === status ? 'active' : ''}`}
                         style={{
                           background: statusFilter === status ? getStatusColor(status) : 'rgba(255, 255, 255, 0.1)'
@@ -344,6 +422,7 @@ const AdminDashboard = () => {
                   <h3 className="section-title">
                     Appointments ({filteredAppointments.length})
                     {statusFilter !== 'All' && ` - ${statusFilter}`}
+                    {selectedDate && ` - ${selectedDate.toLocaleDateString()}`}
                   </h3>
                   
                   <div className="appointments-list">
@@ -351,6 +430,7 @@ const AdminDashboard = () => {
                       <div className="no-appointments">
                         No appointments found
                         {statusFilter !== 'All' && ` with status: ${statusFilter}`}
+                        {selectedDate && ` on ${selectedDate.toLocaleDateString()}`}
                       </div>
                     ) : (
                       filteredAppointments.map(appointment => (
@@ -372,15 +452,19 @@ const AdminDashboard = () => {
                           </div>
                           
                           <div className="appointment-details">
-                            <div>
+                            <div className="appointment-info">
                               <div className="appointment-time">
-                                Time: {appointment.preferred_time}
+                                <strong>Time:</strong> {appointment.preferred_time}
                               </div>
                               <div className="appointment-concern">
-                                Concern: {appointment.concern_type}
+                                <strong>Concern:</strong> {appointment.concern_type}
                               </div>
-                              <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', marginTop: '5px' }}>
-                                User ID: {appointment.user_id}
+                              <div className="appointment-user">
+                                <strong>Student:</strong> {appointment.user_info?.username || 'Unknown'} 
+                                ({appointment.user_info?.id_number || 'N/A'})
+                              </div>
+                              <div className="appointment-created">
+                                <strong>Scheduled:</strong> {new Date(appointment.created_at).toLocaleString()}
                               </div>
                             </div>
                             
@@ -417,13 +501,18 @@ const AdminDashboard = () => {
                                   </button>
                                 </>
                               )}
-                              {(appointment.status === 'Rejected' || appointment.status === 'Cancelled' || appointment.status === 'Completed') && (
+                              {(appointment.status === 'Rejected' || appointment.status === 'Cancelled') && (
                                 <button
                                   onClick={() => handleStatusUpdate(appointment._id, 'Pending')}
                                   className="action-btn reset"
                                 >
-                                  Reset
+                                  Reset to Pending
                                 </button>
+                              )}
+                              {appointment.status === 'Completed' && (
+                                <div className="completed-text" style={{color: '#4CAF50', fontStyle: 'italic'}}>
+                                  Completed - No actions available
+                                </div>
                               )}
                             </div>
                           </div>

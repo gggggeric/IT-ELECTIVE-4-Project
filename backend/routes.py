@@ -1,6 +1,7 @@
 from flask import jsonify, request
-from database import find_user_by_username, find_user_by_id_number, insert_user, insert_appointment, find_appointments_by_user_id, update_appointment_status, get_all_appointments, find_user_by_id
+from database import find_user_by_username, find_user_by_id_number, insert_user, insert_appointment, find_appointments_by_user_id, update_appointment_status, get_all_appointments, find_user_by_id, find_appointment_by_id, get_appointments_with_user_details
 from models import User, Appointment
+from bson import ObjectId
 
 def init_routes(app):
     @app.route('/')
@@ -218,7 +219,6 @@ def init_routes(app):
                 'error': str(e)
             }), 500
 
-    # New endpoint to update appointment status (for admin approval)
     @app.route('/appointments/<appointment_id>/status', methods=['PUT'])
     def update_appointment_status_route(appointment_id):
         try:
@@ -226,48 +226,45 @@ def init_routes(app):
             
             if not data or not data.get('status'):
                 return jsonify({
-                    'message': 'Invalid request data',
-                    'error': 'Status is required'
+                    'message': 'Status is required'
                 }), 400
             
-            # Validate status values
+            # Validate status
             valid_statuses = ['Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed']
             if data['status'] not in valid_statuses:
                 return jsonify({
-                    'message': 'Invalid status',
-                    'error': f'Status must be one of: {", ".join(valid_statuses)}'
+                    'message': f'Status must be one of: {", ".join(valid_statuses)}'
                 }), 400
             
-            result = update_appointment_status(appointment_id, data['status'])
+            # SIMPLE: Just update the status directly
+            success, message = update_appointment_status(appointment_id, data['status'])
             
-            if result:
+            if success:
                 return jsonify({
                     'message': f'Appointment status updated to {data["status"]}',
-                    'appointment_id': appointment_id,
                     'status': data['status']
                 }), 200
             else:
                 return jsonify({
                     'message': 'Failed to update appointment status',
-                    'error': 'Appointment not found or update failed'
-                }), 404
-            
+                    'error': message
+                }), 400
+                
         except Exception as e:
-            print(f"❌ Error updating appointment status: {e}")
             return jsonify({
                 'message': 'Error updating appointment status',
                 'error': str(e)
             }), 500
-
-    # New endpoint to get all appointments (for admin/counselor view)
+        
+    # Enhanced endpoint to get all appointments with user details
     @app.route('/all-appointments', methods=['GET'])
     def get_all_appointments_route():
         try:
-            appointments = get_all_appointments()
+            appointments = get_appointments_with_user_details()
             
             return jsonify({
                 'message': 'All appointments retrieved successfully',
-                'appointments': [appointment.to_dict() for appointment in appointments]
+                'appointments': appointments
             }), 200
             
         except Exception as e:
@@ -304,28 +301,6 @@ def init_routes(app):
             print(f"❌ Error retrieving user profile: {e}")
             return jsonify({
                 'message': 'Error retrieving user profile',
-                'error': str(e)
-            }), 500
-
-
-        try:
-            from database import mongo
-            # Test database connection
-            mongo.db.command('ping')
-            
-            # Test users collection
-            users_count = mongo.db.users.count_documents({})
-            appointments_count = mongo.db.appointments.count_documents({})
-            
-            return jsonify({
-                'message': 'Database connection successful',
-                'users_count': users_count,
-                'appointments_count': appointments_count,
-                'collections': mongo.db.list_collection_names()
-            })
-        except Exception as e:
-            return jsonify({
-                'message': 'Database connection failed',
                 'error': str(e)
             }), 500
 
@@ -366,3 +341,84 @@ def init_routes(app):
                 'message': 'Error accessing appointments collection',
                 'error': str(e)
             }), 500
+
+    # Debug endpoint to check appointment data
+    @app.route('/debug/appointments/<appointment_id>')
+    def debug_appointment(appointment_id):
+        try:
+            result = find_appointment_by_id(appointment_id)
+            if isinstance(result, tuple):
+                appointment, error_msg = result
+            else:
+                appointment, error_msg = result, None
+                
+            if appointment:
+                return jsonify({
+                    'found': True,
+                    'appointment': appointment.to_dict(),
+                    'raw_id': appointment_id,
+                    'is_valid_objectid': ObjectId.is_valid(appointment_id)
+                }), 200
+            else:
+                return jsonify({
+                    'found': False,
+                    'error': error_msg,
+                    'raw_id': appointment_id,
+                    'is_valid_objectid': ObjectId.is_valid(appointment_id)
+                }), 404
+        except Exception as e:
+            return jsonify({
+                'error': str(e),
+                'raw_id': appointment_id
+            }), 500
+
+    # Debug endpoint to list all appointments
+    @app.route('/debug/all-appointments-raw')
+    def debug_all_appointments_raw():
+        try:
+            from database import mongo
+            appointments = list(mongo.db.appointments.find())
+            
+            serialized_appointments = []
+            for apt in appointments:
+                serialized_apt = {
+                    '_id': str(apt['_id']),
+                    'user_id': apt.get('user_id', 'N/A'),
+                    'date': apt.get('date', 'N/A'),
+                    'status': apt.get('status', 'N/A'),
+                    'concern_type': apt.get('concern_type', 'N/A'),
+                    'preferred_time': apt.get('preferred_time', 'N/A'),
+                    'created_at': apt.get('created_at', 'N/A')
+                }
+                serialized_appointments.append(serialized_apt)
+            
+            return jsonify({
+                'appointments': serialized_appointments,
+                'count': len(serialized_appointments)
+            }), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    # Debug endpoint to check user details
+    @app.route('/debug/users')
+    def debug_users():
+        try:
+            from database import mongo
+            users = list(mongo.db.users.find())
+            
+            serialized_users = []
+            for user in users:
+                serialized_user = {
+                    '_id': str(user['_id']),
+                    'username': user.get('username', 'N/A'),
+                    'id_number': user.get('id_number', 'N/A'),
+                    'role': user.get('role', 'N/A')
+                }
+                serialized_users.append(serialized_user)
+            
+            return jsonify({
+                'users': serialized_users,
+                'count': len(serialized_users)
+            }), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500

@@ -36,14 +36,27 @@ class User(UserMixin):
 
     @classmethod
     def from_dict(cls, data):
+        # Handle _id conversion
+        _id = data.get('_id')
+        if _id and not isinstance(_id, ObjectId):
+            _id = ObjectId(_id)
+        
+        # Handle created_at conversion
+        created_at = data.get('created_at')
+        if created_at and isinstance(created_at, str):
+            try:
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                created_at = datetime.utcnow()
+        
         return cls(
             username=data['username'],
             password_hash=data['password_hash'],
             id_number=data.get('id_number'),
             birthdate=data.get('birthdate'),
-            role=data.get('role', 'user'),  # Default to 'user' if not specified
-            _id=data.get('_id', ObjectId()),
-            created_at=data.get('created_at')
+            role=data.get('role', 'user'),
+            _id=_id,
+            created_at=created_at
         )
 
 
@@ -57,6 +70,17 @@ class Appointment:
         self._id = _id or ObjectId()
         self.created_at = created_at or datetime.utcnow()
 
+    @staticmethod
+    def is_valid_status(status):
+        """Validate if status is allowed"""
+        valid_statuses = ['Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed']
+        return status in valid_statuses
+
+    @staticmethod
+    def is_admin_updatable_status(status):
+        """Validate if status can be set by admin (only Approved or Rejected for pending appointments)"""
+        return status in ['Approved', 'Rejected']
+    
     def to_dict(self):
         # Use the actual created_at datetime to generate the formatted string
         current_created_at = self.created_at
@@ -81,6 +105,11 @@ class Appointment:
 
     @classmethod
     def from_dict(cls, data):
+        # Handle _id conversion
+        _id = data.get('_id')
+        if _id and not isinstance(_id, ObjectId):
+            _id = ObjectId(_id)
+        
         # Handle created_at conversion from string to datetime if needed
         created_at = data.get('created_at')
         if created_at and isinstance(created_at, str):
@@ -95,6 +124,6 @@ class Appointment:
             preferred_time=data['preferred_time'],
             concern_type=data['concern_type'],
             status=data.get('status', 'Pending'),  # Default to 'Pending'
-            _id=data.get('_id', ObjectId()),
+            _id=_id,
             created_at=created_at
         )
