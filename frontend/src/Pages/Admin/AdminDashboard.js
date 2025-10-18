@@ -10,9 +10,9 @@ const AdminDashboard = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reportType, setReportType] = useState('all');
   const navigate = useNavigate();
 
-  // Status options
   const statusOptions = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled', 'Completed'];
 
   useEffect(() => {
@@ -27,7 +27,6 @@ const AdminDashboard = () => {
       const userObj = JSON.parse(userData);
       setUser(userObj);
       
-      // Check if user is admin
       if (userObj.role !== 'admin') {
         setError('Access denied. Admin privileges required.');
         setTimeout(() => navigate('/dashboard'), 2000);
@@ -66,11 +65,305 @@ const AdminDashboard = () => {
     }
   };
 
+  // Simple PDF Generation without autoTable
+  const generatePDFReport = () => {
+    // Create a simple HTML table for PDF
+    const reportAppointments = getReportAppointments();
+    
+    let tableHTML = `
+      <html>
+        <head>
+          <title>TUPT Counseling Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #c62828; text-align: center; }
+            h2 { color: #333; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #c62828; color: white; }
+            tr:nth-child(even) { background-color: #f2f2f2; }
+            .summary { background: #f9f9f9; padding: 15px; border-radius: 5px; }
+            .stat { margin: 5px 0; }
+          </style>
+        </head>
+        <body>
+          <h1>TUPT Counseling Appointments Report</h1>
+          <h2>${getReportTypeTitle()}</h2>
+          <div class="summary">
+            <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
+            <p><strong>Total Appointments:</strong> ${reportAppointments.length}</p>
+          </div>
+    `;
+
+    if (reportAppointments.length > 0) {
+      tableHTML += `
+        <table>
+          <thead>
+            <tr>
+              <th>ID Number</th>
+              <th>Student Name</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Concern Type</th>
+              <th>Status</th>
+              <th>Created Date</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      reportAppointments.forEach(apt => {
+        tableHTML += `
+          <tr>
+            <td>${apt.user_info?.id_number || 'N/A'}</td>
+            <td>${apt.user_info?.username || 'Unknown'}</td>
+            <td>${formatDateForPDF(apt.date)}</td>
+            <td>${apt.preferred_time}</td>
+            <td>${apt.concern_type}</td>
+            <td style="color: ${getStatusColor(apt.status)}">${apt.status}</td>
+            <td>${new Date(apt.created_at).toLocaleDateString()}</td>
+          </tr>
+        `;
+      });
+
+      tableHTML += `
+          </tbody>
+        </table>
+      `;
+    } else {
+      tableHTML += `<p style="text-align: center; color: #666;">No appointments found for this report.</p>`;
+    }
+
+    // Add statistics
+    const stats = calculateStatistics();
+    tableHTML += `<div class="summary"><h3>Summary Statistics</h3>`;
+    stats.forEach(stat => {
+      tableHTML += `<div class="stat"><strong>${stat.status}:</strong> ${stat.count} appointments</div>`;
+    });
+    tableHTML += `</div>`;
+
+    tableHTML += `</body></html>`;
+
+    // Open print dialog
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(tableHTML);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const generateDetailedPDFReport = () => {
+    const reportAppointments = getReportAppointments();
+    
+    let detailedHTML = `
+      <html>
+        <head>
+          <title>TUPT Counseling Detailed Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #c62828; text-align: center; }
+            h2 { color: #333; }
+            .appointment-card { 
+              border: 1px solid #ddd; 
+              margin: 15px 0; 
+              padding: 15px; 
+              border-radius: 5px; 
+              background: #f9f9f9;
+            }
+            .appointment-header { 
+              background: #c62828; 
+              color: white; 
+              padding: 10px; 
+              margin: -15px -15px 15px -15px;
+              border-radius: 5px 5px 0 0;
+            }
+            .appointment-detail { margin: 5px 0; }
+            .summary { background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            .stat { margin: 5px 0; }
+            .status { 
+              display: inline-block; 
+              padding: 2px 8px; 
+              border-radius: 3px; 
+              font-weight: bold; 
+              margin-left: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>TUPT Counseling - Detailed Appointments Report</h1>
+          <h2>${getReportTypeTitle()}</h2>
+          <div class="summary">
+            <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+            <p><strong>Total Records:</strong> ${reportAppointments.length}</p>
+          </div>
+    `;
+
+    if (reportAppointments.length === 0) {
+      detailedHTML += `<p style="text-align: center; color: #666; font-size: 18px;">No appointments found for this report.</p>`;
+    } else {
+      reportAppointments.forEach((apt, index) => {
+        detailedHTML += `
+          <div class="appointment-card">
+            <div class="appointment-header">
+              <strong>Appointment #${index + 1}</strong>
+              <span class="status" style="background-color: ${getStatusColor(apt.status)}; color: white;">
+                ${apt.status}
+              </span>
+            </div>
+            <div class="appointment-detail"><strong>Student:</strong> ${apt.user_info?.username || 'Unknown'} (ID: ${apt.user_info?.id_number || 'N/A'})</div>
+            <div class="appointment-detail"><strong>Date:</strong> ${formatDateForPDF(apt.date)}</div>
+            <div class="appointment-detail"><strong>Time:</strong> ${apt.preferred_time}</div>
+            <div class="appointment-detail"><strong>Concern Type:</strong> ${apt.concern_type}</div>
+            <div class="appointment-detail"><strong>Scheduled on:</strong> ${new Date(apt.created_at).toLocaleString()}</div>
+          </div>
+        `;
+      });
+    }
+
+    // Add summary
+    const stats = calculateStatistics();
+    detailedHTML += `<div class="summary"><h3>Report Summary</h3>`;
+    stats.forEach(stat => {
+      detailedHTML += `<div class="stat"><strong>${stat.status}:</strong> ${stat.count} appointments</div>`;
+    });
+    detailedHTML += `</div>`;
+
+    detailedHTML += `</body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(detailedHTML);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  // Alternative: Generate downloadable PDF using browser print
+  const generateDownloadablePDF = () => {
+    const reportAppointments = getReportAppointments();
+    
+    let content = `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h1 style="color: #c62828; text-align: center;">TUPT Counseling Appointments Report</h1>
+        <h2 style="color: #333;">${getReportTypeTitle()}</h2>
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+          <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
+          <p><strong>Total Appointments:</strong> ${reportAppointments.length}</p>
+        </div>
+    `;
+
+    if (reportAppointments.length > 0) {
+      content += `
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <thead>
+            <tr style="background-color: #c62828; color: white;">
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">ID Number</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Student Name</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Date</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Time</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Concern Type</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      reportAppointments.forEach(apt => {
+        content += `
+          <tr style="border: 1px solid #ddd;">
+            <td style="border: 1px solid #ddd; padding: 8px;">${apt.user_info?.id_number || 'N/A'}</td>
+            <td style="border: 1px solid #ddd; padding: 8px;">${apt.user_info?.username || 'Unknown'}</td>
+            <td style="border: 1px solid #ddd; padding: 8px;">${formatDateForPDF(apt.date)}</td>
+            <td style="border: 1px solid #ddd; padding: 8px;">${apt.preferred_time}</td>
+            <td style="border: 1px solid #ddd; padding: 8px;">${apt.concern_type}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; color: ${getStatusColor(apt.status)};">${apt.status}</td>
+          </tr>
+        `;
+      });
+
+      content += `</tbody></table>`;
+    }
+
+    const stats = calculateStatistics();
+    content += `<div style="background: #f9f9f9; padding: 15px; border-radius: 5px;"><h3>Summary Statistics</h3>`;
+    stats.forEach(stat => {
+      content += `<div style="margin: 5px 0;"><strong>${stat.status}:</strong> ${stat.count} appointments</div>`;
+    });
+    content += `</div></div>`;
+
+    // Create a blob and download
+    const blob = new Blob([content], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `counseling_report_${reportType}_${new Date().toISOString().split('T')[0]}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const getReportAppointments = () => {
+    switch (reportType) {
+      case 'all':
+        return appointments;
+      case 'approved':
+        return appointments.filter(apt => apt.status === 'Approved');
+      case 'rejected':
+        return appointments.filter(apt => apt.status === 'Rejected');
+      case 'filtered':
+        return filteredAppointments;
+      default:
+        return appointments;
+    }
+  };
+
+  const getReportTypeTitle = () => {
+    switch (reportType) {
+      case 'all': return 'All Appointments';
+      case 'approved': return 'Approved Appointments';
+      case 'rejected': return 'Rejected Appointments';
+      case 'filtered': return `Filtered Appointments (${statusFilter})`;
+      default: return 'Appointments Report';
+    }
+  };
+
+  const calculateStatistics = () => {
+    const reportApps = getReportAppointments();
+    const statusCounts = {};
+    
+    statusOptions.forEach(status => {
+      if (status !== 'All') {
+        statusCounts[status] = reportApps.filter(apt => apt.status === status).length;
+      }
+    });
+    
+    return Object.entries(statusCounts).map(([status, count]) => ({
+      status,
+      count
+    }));
+  };
+
+  const formatDateForPDF = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Pending': return '#FFA500';
+      case 'Approved': return '#90EE90';
+      case 'Rejected': return '#FF6B6B';
+      case 'Cancelled': return '#B0B0B0';
+      case 'Completed': return '#4CAF50';
+      default: return '#FFFFFF';
+    }
+  };
+
   const handleStatusUpdate = async (appointmentId, newStatus) => {
     try {
       setError('');
       
-      // Client-side validation for pending appointments
       const appointment = appointments.find(apt => apt._id === appointmentId);
       if (appointment && appointment.status === 'Pending' && !['Approved', 'Rejected'].includes(newStatus)) {
         setError('Pending appointments can only be approved or rejected.');
@@ -89,7 +382,6 @@ const AdminDashboard = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Update local state instead of refetching all appointments
         setAppointments(prevAppointments => 
           prevAppointments.map(apt => 
             apt._id === appointmentId 
@@ -98,7 +390,6 @@ const AdminDashboard = () => {
           )
         );
         
-        // Update filtered appointments as well
         setFilteredAppointments(prevFiltered => 
           prevFiltered.map(apt => 
             apt._id === appointmentId 
@@ -107,7 +398,6 @@ const AdminDashboard = () => {
           )
         );
         
-        // Show success message
         alert(`Appointment ${newStatus.toLowerCase()} successfully!`);
       } else {
         throw new Error(data.error || 'Failed to update appointment');
@@ -122,12 +412,10 @@ const AdminDashboard = () => {
   const applyFilters = (appts, statusFilter, date) => {
     let filtered = appts;
     
-    // Apply status filter
     if (statusFilter !== 'All') {
       filtered = filtered.filter(apt => apt.status === statusFilter);
     }
     
-    // Apply date filter
     if (date) {
       filtered = filtered.filter(apt => {
         const aptDate = new Date(apt.date);
@@ -161,17 +449,6 @@ const AdminDashboard = () => {
     });
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Pending': return '#FFA500';
-      case 'Approved': return '#90EE90';
-      case 'Rejected': return '#FF6B6B';
-      case 'Cancelled': return '#B0B0B0';
-      case 'Completed': return '#4CAF50';
-      default: return '#FFFFFF';
-    }
-  };
-
   const formatDate = (dateString) => {
     const options = { 
       year: 'numeric', 
@@ -189,7 +466,7 @@ const AdminDashboard = () => {
     navigate('/');
   };
 
-  // Calendar component
+  // Calendar component (keep the same as before)
   const Calendar = ({ onDateSelect, selectedDate, appointments }) => {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     
@@ -212,12 +489,10 @@ const AdminDashboard = () => {
       const firstDay = getFirstDayOfMonth(currentMonth);
       const days = [];
 
-      // Empty days for the first week
       for (let i = 0; i < firstDay; i++) {
         days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
       }
 
-      // Days of the month
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
         const dayAppointments = getAppointmentsForDate(date);
@@ -355,6 +630,44 @@ const AdminDashboard = () => {
                         {appointments.filter(apt => apt.status === 'Rejected').length}
                       </div>
                       <div className="stat-label">Rejected</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* PDF Report Generation */}
+                <div style={{ marginBottom: '20px' }}>
+                  <h3 className="dashboard-subtitle">Generate Reports</h3>
+                  <div className="report-controls">
+                    <select 
+                      value={reportType}
+                      onChange={(e) => setReportType(e.target.value)}
+                      className="report-select"
+                    >
+                      <option value="all">All Appointments</option>
+                      <option value="approved">Approved Only</option>
+                      <option value="rejected">Rejected Only</option>
+                      <option value="filtered">Current Filter</option>
+                    </select>
+                    
+                    <div className="report-buttons">
+                      <button 
+                        onClick={generatePDFReport}
+                        className="report-btn summary"
+                      >
+                        Print Summary Report
+                      </button>
+                      <button 
+                        onClick={generateDetailedPDFReport}
+                        className="report-btn detailed"
+                      >
+                        Print Detailed Report
+                      </button>
+                      <button 
+                        onClick={generateDownloadablePDF}
+                        className="report-btn download"
+                      >
+                        Download HTML Report
+                      </button>
                     </div>
                   </div>
                 </div>

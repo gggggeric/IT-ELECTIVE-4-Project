@@ -145,6 +145,66 @@
   transform: translateY(-1px);
 }
 
+/* Report Generation Styles */
+.report-controls {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+}
+
+.report-select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  margin-bottom: 10px;
+}
+
+.report-select option {
+  background: #2a2a2a;
+  color: white;
+}
+
+.report-buttons {
+  display: flex;
+  gap: 10px;
+  flex-direction: column;
+}
+
+.report-btn {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  color: white;
+}
+
+.report-btn.summary {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+}
+
+.report-btn.detailed {
+  background: linear-gradient(135deg, #2196F3, #1976D2);
+}
+
+.report-btn.download {
+  background: linear-gradient(135deg, #FF9800, #F57C00);
+}
+
+.report-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.report-btn:active {
+  transform: translateY(0);
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   .logout-section {
